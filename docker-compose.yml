@@ -1,0 +1,16 @@
+services:
+  opencampaign:
+    build: .
+    container_name: opencampaign
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # the URL subscribers will see in tracking / unsubscribe links
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      DATABASE_URL: file:/data/opencampaign.db
+    volumes:
+      - opencampaign-data:/data
+
+volumes:
+  opencampaign-data:
