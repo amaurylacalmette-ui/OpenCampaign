@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String       @default("")
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  sessions     Session[]
+  contacts     Contact[]
+  campaigns    Campaign[]
+  templates    Template[]
+  automations  Automation[]
+  activities   Activity[]
+  setting      Settings?
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Contact {
+  id         String              @id @default(cuid())
+  userId     String
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email      String
+  firstName  String              @default("")
+  lastName   String              @default("")
+  company    String              @default("")
+  status     String              @default("subscribed") // subscribed | pending | unsubscribed | cleaned
+  tags       String              @default("") // comma separated
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  recipients CampaignRecipient[]
+  jobs       AutomationJob[]
+
+  @@unique([userId, email])
+}
+
+model Campaign {
+  id          String              @id @default(cuid())
+  userId      String
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  subject     String              @default("")
+  previewText String              @default("")
+  fromName    String              @default("")
+  fromEmail   String              @default("")
+  content     String              @default("")
+  status      String              @default("draft") // draft | scheduled | sent
+  scheduledAt DateTime?
+  sentAt      DateTime?
+  analysis    String?             // last AI analysis result (JSON)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  recipients  CampaignRecipient[]
+}
+
+model CampaignRecipient {
+  id          String    @id @default(cuid())
+  campaignId  String
+  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contactId   String
+  contact     Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  status      String    @default("sent") // sent | bounced
+  openCount   Int       @default(0)
+  clickCount  Int       @default(0)
+  lastOpened  DateTime?
+  lastClicked DateTime?
+  token       String    @unique @default(cuid())
+  createdAt   DateTime  @default(now())
+
+  @@unique([campaignId, contactId])
+}
+
+model Template {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  category  String   @default("general")
+  subject   String   @default("")
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Automation {
+  id         String           @id @default(cuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  trigger    String           @default("signup") // signup | tag
+  triggerTag String           @default("")
+  delayHours Int              @default(0)
+  subject    String
+  fromName   String           @default("")
+  fromEmail  String           @default("")
+  content    String
+  status     String           @default("active") // active | paused
+  sentCount  Int              @default(0)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  jobs       AutomationJob[]
+}
+
+model AutomationJob {
+  id            String     @id @default(cuid())
+  automationId  String
+  automation    Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  contactId     String
+  contact       Contact    @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  status        String     @default("queued") // queued | sent | failed
+  dueAt         DateTime   @default(now())
+  sentAt        DateTime?
+  error         String     @default("")
+  createdAt     DateTime   @default(now())
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // campaign_sent | contact_added | contact_imported | automation_sent | contact_unsubscribed | ai_analysis | automation_created ...
+  message   String
+  meta      String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model Settings {
+  id            String  @id @default(cuid())
+  userId        String  @unique
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromName      String  @default("")
+  fromEmail     String  @default("")
+  replyTo       String  @default("")
+  // Delivery
+  smtpHost      String  @default("")
+  smtpPort      Int     @default(587)
+  smtpUser      String  @default("")
+  smtpPass      String  @default("")
+  smtpSecure    Boolean @default(false)
+  doubleOptIn   Boolean @default(false)
+  // AI
+  aiProvider    String  @default("local") // local | openrouter | openai | publikhq
+  openrouterKey String  @default("")
+  openaiKey     String  @default("")
+  publikhqUrl   String  @default("https://publikhq.com")
+  publikhqKey   String  @default("")
+}
